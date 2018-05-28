@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+override_dh_auto_test:
+	python setup.py test
+
+override_dh_auto_clean:
+	rm -rf src/unittest_xml_reporting.egg-info
+	dh_auto_clean
+
+%:
+	dh $@ --with python2,python3 --buildsystem=pybuild --parallel
+
