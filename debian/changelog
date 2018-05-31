@@ -1,5 +1,13 @@
-unittest-xml-reporting (1.5.0-1) unstable; urgency=low
+unittest-xml-reporting (2.2.0-1kern1) bionic; urgency=medium
 
+  * new upstream release
+  * build for python3
+
+ -- KERN packaging <packaging@kernsuite.info>  Mon, 28 May 2018 16:28:25 +0200
+
+unittest-xml-reporting (1.5.0-1) unstable; urgency=medium
+
+  [ Jonathan Wiltshire ]
   * New upstream release (Closes: #708654)
   * Adopt python-xmlrunner:
     - rename source package to match upstream
@@ -11,7 +19,7 @@ unittest-xml-reporting (1.5.0-1) unstable; urgency=low
   * Activate tests (they are empty at the moment, but ready for
     when upstream adds some)
 
- -- Jonathan Wiltshire <jmw@tiger-computing.co.uk>  Mon, 03 Jun 2013 16:55:01 +0100
+ -- KERN packaging <packaging@kernsuite.info>  Mon, 28 May 2018 16:27:55 +0200
 
 python-xmlrunner (1.2-2) UNRELEASED; urgency=low
 
