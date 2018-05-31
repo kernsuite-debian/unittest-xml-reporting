@@ -7,7 +7,15 @@ Build-Depends: debhelper (>= 8.0.0),
  python-all (>= 2.6.6-3~),
  python3-all,
  python-setuptools,
- python3-setuptools
+ python3-setuptools,
+ python-six,
+ python3-six,
+ python-mock,
+ python3-mock,
+ python-pytest-runner,
+ python-pytest,
+ python-lxml,
+ python3-lxml
 Standards-Version: 3.9.3
 X-Python-Version: >= 2.6
 X-Python3-Version: >= 3.4
