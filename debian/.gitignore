@@ -1,3 +1,15 @@
-python-xmlrunner.install
-python3-xmlrunner.install
 unittest-xml-reporting.doc-base
+.debhelper/
+files
+python-xmlrunner.debhelper.log
+python-xmlrunner.postinst.debhelper
+python-xmlrunner.prerm.debhelper
+python-xmlrunner.substvars
+python-xmlrunner/
+python3-xmlrunner.debhelper.log
+python3-xmlrunner.postinst.debhelper
+python3-xmlrunner.prerm.debhelper
+python3-xmlrunner.substvars
+python3-xmlrunner/
+tmp/
+
