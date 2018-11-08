@@ -1,3 +1,10 @@
+unittest-xml-reporting (2.2.0-1kern2) bionic; urgency=medium
+
+  [ Gijs Molenaar ]
+  * actually install the modules
+
+ -- KERN packaging <packaging@kernsuite.info>  Thu, 08 Nov 2018 10:06:09 +0100
+
 unittest-xml-reporting (2.2.0-1kern1) bionic; urgency=medium
 
   * new upstream release
