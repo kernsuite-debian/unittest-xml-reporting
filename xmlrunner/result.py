@@ -1,14 +1,16 @@
 
+import inspect
 import io
 import os
 import sys
 import datetime
-import time
 import traceback
-import six
 import re
 from os import path
-from six.moves import StringIO
+from io import StringIO
+
+# use direct import to bypass freezegun
+from time import time
 
 from .unittest import TestResult, _TextTestResult, failfast
 
@@ -35,7 +37,7 @@ if sys.maxunicode >= 0x10000:  # not narrow build
     ])
 
 _illegal_ranges = [
-    "%s-%s" % (six.unichr(low), six.unichr(high))
+    "%s-%s" % (chr(low), chr(high))
     for (low, high) in _illegal_unichrs
 ]
 
@@ -46,30 +48,14 @@ STDOUT_LINE = '\nStdout:\n%s'
 STDERR_LINE = '\nStderr:\n%s'
 
 
-def xml_safe_unicode(base, encoding='utf-8'):
+def safe_unicode(data, encoding='utf8'):
     """Return a unicode string containing only valid XML characters.
 
-    encoding - if base is a byte string it is first decoded to unicode
+    encoding - if data is a byte string it is first decoded to unicode
         using this encoding.
     """
-    if isinstance(base, six.binary_type):
-        base = base.decode(encoding)
-    return INVALID_XML_1_0_UNICODE_RE.sub('', base)
-
-
-def to_unicode(data):
-    """Returns unicode in Python2 and str in Python3"""
-    if six.PY3:
-        return six.text_type(data)
-    try:
-        # Try utf8
-        return six.text_type(data)
-    except UnicodeDecodeError:
-        return repr(data).decode('utf8', 'replace')
-
-
-def safe_unicode(data, encoding=None):
-    return xml_safe_unicode(to_unicode(data), encoding)
+    data = str(data)
+    return INVALID_XML_1_0_UNICODE_RE.sub('', data)
 
 
 def testcase_name(test_method):
@@ -81,6 +67,16 @@ def testcase_name(test_method):
         module = ''
     result = module + testcase.__name__
     return result
+
+
+def resolve_filename(filename):
+    # Try to make filename relative to current directory.
+    try:
+        rel_filename = os.path.relpath(filename)
+    except ValueError:
+        return filename
+    # if not inside folder, keep as-is
+    return filename if rel_filename.startswith('../') else rel_filename
 
 
 class _DuplicateWriter(io.TextIOBase):
@@ -102,6 +98,9 @@ class _DuplicateWriter(io.TextIOBase):
     def writable(self):
         return True
 
+    def getvalue(self):
+        return self._second.getvalue()
+
     def writelines(self, lines):
         self._first.writelines(lines)
         self._second.writelines(lines)
@@ -116,8 +115,7 @@ class _DuplicateWriter(io.TextIOBase):
 
             return wrote
         else:
-            # file-like object in Python2
-            # It doesn't return wrote bytes.
+            # file-like object that doesn't return wrote bytes.
             self._first.write(b)
             self._second.write(b)
             return len(b)
@@ -132,7 +130,14 @@ class _TestInfo(object):
     # Possible test outcomes
     (SUCCESS, FAILURE, ERROR, SKIP) = range(4)
 
-    def __init__(self, test_result, test_method, outcome=SUCCESS, err=None, subTest=None):
+    OUTCOME_ELEMENTS = {
+        SUCCESS: None,
+        FAILURE: 'failure',
+        ERROR: 'error',
+        SKIP: 'skipped',
+    }
+
+    def __init__(self, test_result, test_method, outcome=SUCCESS, err=None, subTest=None, filename=None, lineno=None, doc=None):
         self.test_result = test_result
         self.outcome = outcome
         self.elapsed_time = 0
@@ -156,8 +161,14 @@ class _TestInfo(object):
 
         self.test_name = testcase_name(test_method)
         self.test_id = test_method.id()
+
         if subTest:
             self.test_id = subTest.id()
+            self.test_description = self.test_result.getDescription(subTest)
+
+        self.filename = filename
+        self.lineno = lineno
+        self.doc = doc
 
     def id(self):
         return self.test_id
@@ -169,12 +180,6 @@ class _TestInfo(object):
             self.test_result.stop_time - self.test_result.start_time
         timestamp = datetime.datetime.fromtimestamp(self.test_result.stop_time)
         self.timestamp = timestamp.replace(microsecond=0).isoformat()
-
-    def get_description(self):
-        """
-        Return a text representation of the test method.
-        """
-        return self.test_description
 
     def get_error_info(self):
         """
@@ -203,6 +208,9 @@ class _XMLTestResult(_TextTestResult):
         self.callback = None
         self.elapsed_times = elapsed_times
         self.properties = properties  # junit testsuite properties
+        self.filename = None
+        self.lineno = None
+        self.doc = None
         if infoclass is None:
             self.infoclass = _TestInfo
         else:
@@ -214,6 +222,9 @@ class _XMLTestResult(_TextTestResult):
         Appends a `infoclass` to the given target list and sets a callback
         method to be called by stopTest method.
         """
+        test_info.filename = self.filename
+        test_info.lineno = self.lineno
+        test_info.doc = self.doc
         target_list.append(test_info)
 
         def callback():
@@ -233,18 +244,43 @@ class _XMLTestResult(_TextTestResult):
                 )
             elif self.dots:
                 self.stream.write(short_str)
+
+            self.stream.flush()
+
         self.callback = callback
 
     def startTest(self, test):
         """
         Called before execute each test method.
         """
-        self.start_time = time.time()
+        self.start_time = time()
         TestResult.startTest(self, test)
+
+        try:
+            if getattr(test, '_dt_test', None) is not None:
+                # doctest.DocTestCase
+                self.filename = test._dt_test.filename
+                self.lineno = test._dt_test.lineno
+            else:
+                # regular unittest.TestCase?
+                test_method = getattr(test, test._testMethodName)
+                test_class = type(test)
+                # Note: inspect can get confused with decorators, so use class.
+                self.filename = inspect.getsourcefile(test_class)
+                # Handle partial and partialmethod objects.
+                test_method = getattr(test_method, 'func', test_method)
+                _, self.lineno = inspect.getsourcelines(test_method)
+
+                self.doc = test_method.__doc__
+        except (AttributeError, IOError, TypeError):
+            # issue #188, #189, #195
+            # some frameworks can make test method opaque.
+            pass
 
         if self.showAll:
             self.stream.write('  ' + self.getDescription(test))
             self.stream.write(" ... ")
+            self.stream.flush()
 
     def _setupStdout(self):
         """
@@ -285,7 +321,7 @@ class _XMLTestResult(_TextTestResult):
         # self._stderr_data = sys.stderr.getvalue()
 
         _TextTestResult.stopTest(self, test)
-        self.stop_time = time.time()
+        self.stop_time = time()
 
         if self.callback and callable(self.callback):
             self.callback()
@@ -297,7 +333,7 @@ class _XMLTestResult(_TextTestResult):
         """
         self._save_output_data()
         self._prepare_callback(
-            self.infoclass(self, test), self.successes, 'OK', '.'
+            self.infoclass(self, test), self.successes, 'ok', '.'
         )
 
     @failfast
@@ -333,14 +369,29 @@ class _XMLTestResult(_TextTestResult):
         Called when a subTest method raises an error.
         """
         if err is not None:
+
+            errorText = None
+            errorValue = None
+            errorList = None
+            if issubclass(err[0], test.failureException):
+                errorText = 'FAIL'
+                errorValue = self.infoclass.FAILURE
+                errorList = self.failures
+
+            else:
+                errorText = 'ERROR'
+                errorValue = self.infoclass.ERROR
+                errorList = self.errors
+
             self._save_output_data()
+
             testinfo = self.infoclass(
-                self, testcase, self.infoclass.ERROR, err, subTest=test)
-            self.errors.append((
+                self, testcase, errorValue, err, subTest=test)
+            errorList.append((
                 testinfo,
                 self._exc_info_to_string(err, testcase)
             ))
-            self._prepare_callback(testinfo, [], 'ERROR', 'E')
+            self._prepare_callback(testinfo, [], errorText, errorText[0])
 
     def addSkip(self, test, reason):
         """
@@ -349,8 +400,40 @@ class _XMLTestResult(_TextTestResult):
         self._save_output_data()
         testinfo = self.infoclass(
             self, test, self.infoclass.SKIP, reason)
+        testinfo.test_exception_name = 'skip'
+        testinfo.test_exception_message = reason
         self.skipped.append((testinfo, reason))
-        self._prepare_callback(testinfo, [], 'SKIP', 'S')
+        self._prepare_callback(testinfo, [], 'skip', 's')
+
+    def addExpectedFailure(self, test, err):
+        """
+        Missing in xmlrunner, copy-pasted from xmlrunner addError.
+        """
+        self._save_output_data()
+
+        testinfo = self.infoclass(self, test, self.infoclass.SKIP, err)
+        testinfo.test_exception_name = 'XFAIL'
+        testinfo.test_exception_message = 'expected failure: {}'.format(testinfo.test_exception_message)
+
+        self.expectedFailures.append((testinfo, self._exc_info_to_string(err, test)))
+        self._prepare_callback(testinfo, [], 'expected failure', 'x')
+
+    @failfast
+    def addUnexpectedSuccess(self, test):
+        """
+        Missing in xmlrunner, copy-pasted from xmlrunner addSuccess.
+        """
+        self._save_output_data()
+
+        testinfo = self.infoclass(self, test)  # do not set outcome here because it will need exception
+        testinfo.outcome = self.infoclass.ERROR
+        # But since we want to have error outcome, we need to provide additional fields:
+        testinfo.test_exception_name = 'UnexpectedSuccess'
+        testinfo.test_exception_message = ('Unexpected success: This test was marked as expected failure but passed, '
+                                           'please review it')
+
+        self.unexpectedSuccesses.append((testinfo, 'unexpected success'))
+        self._prepare_callback(testinfo, [], 'unexpected success', 'u')
 
     def printErrorList(self, flavour, errors):
         """
@@ -360,10 +443,11 @@ class _XMLTestResult(_TextTestResult):
             self.stream.writeln(self.separator1)
             self.stream.writeln(
                 '%s [%.3fs]: %s' % (flavour, test_info.elapsed_time,
-                                    test_info.get_description())
+                                    test_info.test_description)
             )
             self.stream.writeln(self.separator2)
             self.stream.writeln('%s' % test_info.get_error_info())
+            self.stream.flush()
 
     def _get_info_by_testcase(self):
         """
@@ -374,7 +458,7 @@ class _XMLTestResult(_TextTestResult):
         tests_by_testcase = {}
 
         for tests in (self.successes, self.failures, self.errors,
-                      self.skipped):
+                      self.skipped, self.expectedFailures, self.unexpectedSuccesses):
             for test_info in tests:
                 if isinstance(test_info, tuple):
                     # This is a skipped, error or a failure test case
@@ -405,9 +489,12 @@ class _XMLTestResult(_TextTestResult):
         """
         testsuite = xml_document.createElement('testsuite')
         parentElement.appendChild(testsuite)
+        module_name = suite_name.rpartition('.')[0]
+        file_name = module_name.replace('.', '/') + '.py'
 
         testsuite.setAttribute('name', suite_name)
         testsuite.setAttribute('tests', str(len(tests)))
+        testsuite.setAttribute('file', file_name)
 
         testsuite.setAttribute(
             'time', '%.3f' % sum(map(lambda e: e.elapsed_time, tests))
@@ -431,28 +518,6 @@ class _XMLTestResult(_TextTestResult):
         for test in tests:
             _XMLTestResult._report_testcase(test, testsuite, xml_document)
 
-        systemout = xml_document.createElement('system-out')
-        testsuite.appendChild(systemout)
-
-        stdout = StringIO()
-        for test in tests:
-            # Merge the stdout from the tests in a class
-            if test.stdout is not None:
-                stdout.write(test.stdout)
-        _XMLTestResult._createCDATAsections(
-            xml_document, systemout, stdout.getvalue())
-
-        systemerr = xml_document.createElement('system-err')
-        testsuite.appendChild(systemerr)
-
-        stderr = StringIO()
-        for test in tests:
-            # Merge the stderr from the tests in a class
-            if test.stderr is not None:
-                stderr.write(test.stderr)
-        _XMLTestResult._createCDATAsections(
-            xml_document, systemerr, stderr.getvalue())
-
         return testsuite
 
     _report_testsuite = staticmethod(_report_testsuite)
@@ -461,7 +526,11 @@ class _XMLTestResult(_TextTestResult):
         """
         Returns the test method name.
         """
-        return test_id.split('.')[-1]
+        # Trick subtest referencing objects
+        subtest_parts = test_id.split(' ')
+        test_method_name = subtest_parts[0].split('.')[-1]
+        subtest_method_name = [test_method_name] + subtest_parts[1:]
+        return ' '.join(subtest_method_name)
 
     _test_method_name = staticmethod(_test_method_name)
 
@@ -487,7 +556,10 @@ class _XMLTestResult(_TextTestResult):
         xml_testsuite.appendChild(testcase)
 
         class_name = re.sub(r'^__main__.', '', test_result.id())
-        class_name = class_name.rpartition('.')[0]
+
+        # Trick subtest referencing objects
+        class_name = class_name.split(' ')[0].rpartition('.')[0]
+
         testcase.setAttribute('classname', class_name)
         testcase.setAttribute(
             'name', _XMLTestResult._test_method_name(test_result.test_id)
@@ -495,25 +567,50 @@ class _XMLTestResult(_TextTestResult):
         testcase.setAttribute('time', '%.3f' % test_result.elapsed_time)
         testcase.setAttribute('timestamp', test_result.timestamp)
 
-        if (test_result.outcome != test_result.SUCCESS):
-            elem_name = ('failure', 'error', 'skipped')[test_result.outcome-1]
-            failure = xml_document.createElement(elem_name)
-            testcase.appendChild(failure)
-            if test_result.outcome != test_result.SKIP:
-                failure.setAttribute(
-                    'type',
-                    test_result.test_exception_name
-                )
-                failure.setAttribute(
-                    'message',
-                    test_result.test_exception_message
-                )
+        if test_result.filename is not None:
+            # Try to make filename relative to current directory.
+            filename = resolve_filename(test_result.filename)
+            testcase.setAttribute('file', filename)
+
+        if test_result.lineno is not None:
+            testcase.setAttribute('line', str(test_result.lineno))
+
+        if test_result.doc is not None:
+            comment = str(test_result.doc)
+            # The use of '--' is forbidden in XML comments
+            comment = comment.replace('--', '&#45;&#45;')
+            testcase.appendChild(xml_document.createComment(safe_unicode(comment)))
+
+        result_elem_name = test_result.OUTCOME_ELEMENTS[test_result.outcome]
+
+        if result_elem_name is not None:
+            result_elem = xml_document.createElement(result_elem_name)
+            testcase.appendChild(result_elem)
+
+            result_elem.setAttribute(
+                'type',
+                test_result.test_exception_name
+            )
+            result_elem.setAttribute(
+                'message',
+                test_result.test_exception_message
+            )
+            if test_result.get_error_info():
                 error_info = safe_unicode(test_result.get_error_info())
                 _XMLTestResult._createCDATAsections(
-                    xml_document, failure, error_info)
-            else:
-                failure.setAttribute('type', 'skip')
-                failure.setAttribute('message', test_result.test_exception_message)
+                    xml_document, result_elem, error_info)
+
+        if test_result.stdout:
+            systemout = xml_document.createElement('system-out')
+            testcase.appendChild(systemout)
+            _XMLTestResult._createCDATAsections(
+                xml_document, systemout, test_result.stdout)
+
+        if test_result.stderr:
+            systemout = xml_document.createElement('system-err')
+            testcase.appendChild(systemout)
+            _XMLTestResult._createCDATAsections(
+                xml_document, systemout, test_result.stderr)
 
     _report_testcase = staticmethod(_report_testcase)
 
@@ -525,7 +622,7 @@ class _XMLTestResult(_TextTestResult):
         all_results = self._get_info_by_testcase()
 
         outputHandledAsString = \
-            isinstance(test_runner.output, six.string_types)
+            isinstance(test_runner.output, str)
 
         if (outputHandledAsString and not os.path.exists(test_runner.output)):
             os.makedirs(test_runner.output)
@@ -550,64 +647,29 @@ class _XMLTestResult(_TextTestResult):
             testsuite = _XMLTestResult._report_testsuite(
                 suite_name, tests, doc, parentElement, self.properties
             )
-            xml_content = doc.toprettyxml(
-                indent='\t',
-                encoding=test_runner.encoding
-            )
 
             if outputHandledAsString:
+                xml_content = doc.toprettyxml(
+                    indent='\t',
+                    encoding=test_runner.encoding
+                )
                 filename = path.join(
                     test_runner.output,
                     'TEST-%s.xml' % suite_name)
                 with open(filename, 'wb') as report_file:
                     report_file.write(xml_content)
 
+                if self.showAll:
+                    self.stream.writeln('Generated XML report: {}'.format(filename))
+
         if not outputHandledAsString:
             # Assume that test_runner.output is a stream
+            xml_content = doc.toprettyxml(
+                indent='\t',
+                encoding=test_runner.encoding
+            )
             test_runner.output.write(xml_content)
 
     def _exc_info_to_string(self, err, test):
         """Converts a sys.exc_info()-style tuple of values into a string."""
-        if six.PY3:
-            # It works fine in python 3
-            try:
-                return super(_XMLTestResult, self)._exc_info_to_string(
-                    err, test)
-            except AttributeError:
-                # We keep going using the legacy python <= 2 way
-                pass
-
-        # This comes directly from python2 unittest
-        exctype, value, tb = err
-        # Skip test runner traceback levels
-        while tb and self._is_relevant_tb_level(tb):
-            tb = tb.tb_next
-
-        if exctype is test.failureException:
-            # Skip assert*() traceback levels
-            length = self._count_relevant_tb_levels(tb)
-            msgLines = traceback.format_exception(exctype, value, tb, length)
-        else:
-            msgLines = traceback.format_exception(exctype, value, tb)
-
-        if self.buffer:
-            output = self._stdout_capture.getvalue()
-            error = self._stdout_capture.getvalue()
-            if output:
-                if not output.endswith('\n'):
-                    output += '\n'
-                msgLines.append(STDOUT_LINE % output)
-            if error:
-                if not error.endswith('\n'):
-                    error += '\n'
-                msgLines.append(STDERR_LINE % error)
-        # This is the extra magic to make sure all lines are str
-        encoding = getattr(sys.stdout, 'encoding', 'utf-8')
-        lines = []
-        for line in msgLines:
-            if not isinstance(line, str):
-                # utf8 shouldnt be hard-coded, but not sure f
-                line = line.encode(encoding)
-            lines.append(line)
-
-        return ''.join(lines)
+        return super(_XMLTestResult, self)._exc_info_to_string(err, test)

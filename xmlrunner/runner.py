@@ -1,8 +1,9 @@
 
+import argparse
 import sys
 import time
 
-from .unittest import TextTestRunner
+from .unittest import TextTestRunner, TestProgram
 from .result import _XMLTestResult
 
 # see issue #74, the encoding name needs to be one of
@@ -14,13 +15,11 @@ class XMLTestRunner(TextTestRunner):
     """
     A test runner class that outputs the results in JUnit like XML files.
     """
-    def __init__(self, output='.', outsuffix=None, stream=sys.stderr,
-                 descriptions=True, verbosity=1, elapsed_times=True,
-                 failfast=False, buffer=False, encoding=UTF8,
-                 resultclass=None):
-        TextTestRunner.__init__(self, stream, descriptions, verbosity,
-                                failfast=failfast, buffer=buffer)
-        self.verbosity = verbosity
+    def __init__(self, output='.', outsuffix=None, 
+                 elapsed_times=True, encoding=UTF8,
+                 resultclass=None,
+                 **kwargs):
+        super(XMLTestRunner, self).__init__(**kwargs)
         self.output = output
         self.encoding = encoding
         # None means default timestamped suffix
@@ -115,3 +114,68 @@ class XMLTestRunner(TextTestRunner):
             pass
 
         return result
+
+
+class XMLTestProgram(TestProgram):
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('testRunner', XMLTestRunner)
+        self.warnings = None  # python2 fix
+        self._parseKnownArgs(kwargs)
+        super(XMLTestProgram, self).__init__(*args, **kwargs)
+
+    def _parseKnownArgs(self, kwargs):
+        argv = kwargs.get('argv')
+        if argv is None:
+            argv = sys.argv
+
+        # python2 argparse fix
+        parser = argparse.ArgumentParser(prog='xmlrunner')
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument(
+            '-o', '--output', metavar='DIR',
+            help='Directory for storing XML reports (\'.\' default)')
+        group.add_argument(
+            '--output-file', metavar='FILENAME',
+            help='Filename for storing XML report')
+        namespace, argv = parser.parse_known_args(argv)
+        self.output = namespace.output
+        self.output_file = namespace.output_file
+        kwargs['argv'] = argv
+
+    def _initArgParsers(self):
+        # this code path is only called in python3 (optparse vs argparse)
+        super(XMLTestProgram, self)._initArgParsers()
+
+        for parser in (self._main_parser, self._discovery_parser):
+            group = parser.add_mutually_exclusive_group()
+            group.add_argument(
+                '-o', '--output', metavar='DIR', nargs=1,
+                help='Directory for storing XML reports (\'.\' default)')
+            group.add_argument(
+                '--output-file', metavar='FILENAME', nargs=1,
+                help='Filename for storing XML report')
+
+    def runTests(self):
+        kwargs = dict(
+            verbosity=self.verbosity,
+            failfast=self.failfast,
+            buffer=self.buffer,
+            warnings=self.warnings,
+        )
+        if sys.version_info[:2] > (3, 4):
+            kwargs.update(tb_locals=self.tb_locals)
+
+        output_file = None
+        try:
+            if self.output_file is not None:
+                output_file = open(self.output_file, 'wb')
+                kwargs.update(output=output_file)
+            elif self.output is not None:
+                kwargs.update(output=self.output)
+
+            self.testRunner = self.testRunner(**kwargs)
+            super(XMLTestProgram, self).runTests()
+        finally:
+            if output_file is not None:
+                output_file.close()
