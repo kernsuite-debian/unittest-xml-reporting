@@ -1,2 +1,2 @@
-usr/lib/python3.*/dist-packages/*
+debian/python3-xmlrunner/usr/lib/python3.*/dist-packages/*
 

@@ -3,38 +3,20 @@ Section: python
 Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Jonathan Wiltshire <jmw@tiger-computing.co.uk>
-Build-Depends: debhelper (>= 8.0.0),
- python-all (>= 2.6.6-3~),
+Build-Depends: debhelper (>=11),
+ dh-python,
  python3-all,
- python-setuptools,
  python3-setuptools,
- python-six,
  python3-six,
- python-mock,
  python3-mock,
- python-pytest-runner,
- python-pytest,
- python-lxml,
+ python3-pytest-runner,
+ python3-pytest,
  python3-lxml
-Standards-Version: 3.9.3
-X-Python-Version: >= 2.6
-X-Python3-Version: >= 3.4
+Standards-Version: 4.5.0
+X-Python3-Version: >= 3.6
 Homepage: https://github.com/danielfm/unittest-xml-reporting
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/unittext-xml-reporting
 Vcs-Browser: http://anonscm.debian.org/viewvc/python-modules/packages/unittest-xml-reporting
-
-Package: python-xmlrunner
-Architecture: all
-Depends: ${python:Depends}, ${misc:Depends}
-Recommends: python-unittest2
-Description: PyUnit-based test runner with JUnit like XML reporting
- unittest-xml-reporting is a Python "unittest" test runner that saves test
- results to machine-readble XML files that can be consumed by a wide range of
- development tools such as build systems, IDEs and continuous integration
- servers (such as Hudson/Jenkins).
- .
- It also includes an adaptor so that it can be used in conjunction with the
- Django web development framework.
 
 Package: python3-xmlrunner
 Architecture: all
