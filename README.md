@@ -4,21 +4,92 @@
 [![Documentation Status](https://readthedocs.org/projects/unittest-xml-reporting/badge/?version=latest)](http://unittest-xml-reporting.readthedocs.io/en/latest/?badge=latest)
 
 [![Build Status](https://travis-ci.org/xmlrunner/unittest-xml-reporting.svg?branch=master)](https://travis-ci.org/xmlrunner/unittest-xml-reporting)
-[![Code Health](https://landscape.io/github/xmlrunner/unittest-xml-reporting/master/landscape.png)](https://landscape.io/github/xmlrunner/unittest-xml-reporting/master)
 [![codecov.io Coverage Status](https://codecov.io/github/xmlrunner/unittest-xml-reporting/coverage.svg?branch=master)](https://codecov.io/github/xmlrunner/unittest-xml-reporting?branch=master)
 [![Coveralls Coverage Status](https://coveralls.io/repos/xmlrunner/unittest-xml-reporting/badge.svg?branch=master&service=github)](https://coveralls.io/github/xmlrunner/unittest-xml-reporting?branch=master)
 [![Requirements Status](https://requires.io/github/xmlrunner/unittest-xml-reporting/requirements.svg?branch=master)](https://requires.io/github/xmlrunner/unittest-xml-reporting/requirements/?branch=master)
 
-# unittest-xml-reporting
+# unittest-xml-reporting (aka xmlrunner)
 
-unittest-xml-reporting is a unittest test runner that can save test results
-to XML files that can be consumed by a wide range of tools, such as build
-systems, IDEs and continuous integration servers.
+A unittest test runner that can save test results to XML files in xUnit format.
+The files can be consumed by a wide range of tools, such as build systems, IDEs
+and continuous integration servers.
+
 
 ## Requirements
 
-* Python 2.7 or 3.3+
+* Python 3.5+
+* Please note Python 2.7 end-of-life was in Jan 2020, last version supporting 2.7 was 2.5.2
+* Please note Python 3.4 end-of-life was in Mar 2019, last version supporting 3.4 was 2.5.2
 * Please note Python 2.6 end-of-life was in Oct 2013, last version supporting 2.6 was 1.14.0
+
+
+## Limited support for `unittest.TestCase.subTest`
+
+https://docs.python.org/3/library/unittest.html#unittest.TestCase.subTest
+
+`unittest` has the concept of sub-tests for a `unittest.TestCase`; this doesn't map well to an existing xUnit concept, so you won't find it in the schema. What that means, is that you lose some granularity
+in the reports for sub-tests.
+
+`unittest` also does not report successful sub-tests, so the accounting won't be exact.
+
+## Jenkins plugins
+
+- Jenkins JUnit plugin : https://plugins.jenkins.io/junit/
+- Jenkins xUnit plugin : https://plugins.jenkins.io/xunit/
+
+### Jenkins JUnit plugin
+
+This plugin does not perform XSD validation (at time of writing) and should parse the XML file without issues.
+
+### Jenkins xUnit plugin version 1.100
+
+- [Jenkins (junit-10.xsd), xunit plugin (2014-2018)](https://github.com/jenkinsci/xunit-plugin/blob/14c6e39c38408b9ed6280361484a13c6f5becca7/src/main/resources/org/jenkinsci/plugins/xunit/types/model/xsd/junit-10.xsd), version `1.100`.
+
+This plugin does perfom XSD validation and uses the more lax XSD. This should parse the XML file without issues.
+
+### Jenkins xUnit plugin version 1.104+
+
+- [Jenkins (junit-10.xsd), xunit plugin (2018-current)](https://github.com/jenkinsci/xunit-plugin/blob/ae25da5089d4f94ac6c4669bf736e4d416cc4665/src/main/resources/org/jenkinsci/plugins/xunit/types/model/xsd/junit-10.xsd), version `1.104`+.
+
+This plugin does perfom XSD validation and uses the more strict XSD.
+
+See https://github.com/xmlrunner/unittest-xml-reporting/issues/209
+
+```
+import io
+import unittest
+import xmlrunner
+
+# run the tests storing results in memory
+out = io.BytesIO()
+unittest.main(
+    testRunner=xmlrunner.XMLTestRunner(output=out),
+    failfast=False, buffer=False, catchbreak=False, exit=False)
+```
+
+Transform the results removing extra attributes.
+```
+from xmlrunner.extra.xunit_plugin import transform
+
+with open('TEST-report.xml', 'wb') as report:
+    report.write(transform(out.getvalue()))
+
+```
+
+## JUnit Schema ?
+
+There are many tools claiming to write JUnit reports, so you will find many schemas with minor differences.
+
+We used the XSD that was available in the Jenkins xUnit plugin version `1.100`; a copy is available under `tests/vendor/jenkins/xunit-plugin/.../junit-10.xsd` (see attached license).
+
+You may also find these resources useful:
+
+- https://stackoverflow.com/questions/4922867/what-is-the-junit-xml-format-specification-that-hudson-supports
+- https://stackoverflow.com/questions/11241781/python-unittests-in-jenkins
+- [JUnit-Schema (JUnit.xsd)](https://github.com/windyroad/JUnit-Schema/blob/master/JUnit.xsd)
+- [Windyroad (JUnit.xsd)](http://windyroad.com.au/dl/Open%20Source/JUnit.xsd)
+- [a gist (Jenkins xUnit test result schema)](https://gist.github.com/erikd/4192748)
+
 
 ## Installation
 
@@ -49,6 +120,21 @@ $ sudo python setup.py install
 Or you can manually download the latest released version from
 [PyPI](https://pypi.python.org/pypi/unittest-xml-reporting/).
 
+
+## Command-line
+
+````bash
+python -m xmlrunner [options]
+python -m xmlrunner discover [options]
+
+# help
+python -m xmlrunner -h
+````
+
+e.g. 
+````bash
+python -m xmlrunner discover -t ~/mycode/tests -o /tmp/build/junit-reports
+````
 
 ## Usage
 
@@ -136,7 +222,7 @@ if __name__ == "__main__":
     xmlrunner.XMLTestRunner().run(suite)
 ````
 
-### Django
+### Django support
 
 In order to plug `XMLTestRunner` to a Django project, add the following
 to your `settings.py`:
@@ -147,32 +233,12 @@ TEST_RUNNER = 'xmlrunner.extra.djangotestrunner.XMLTestRunner'
 
 Also, the following settings are provided so you can fine tune the reports:
 
-**TEST_OUTPUT_VERBOSE** (Default: `1`, choose between `0`,`1`, and `2`)
-
-Besides the XML reports generated by the test runner, a bunch of useful
-information is printed to the `sys.stderr` stream, just like the
-`TextTestRunner` does. Use this setting to choose between a verbose and a
-non-verbose output.
-
-**TEST_OUTPUT_DESCRIPTIONS** (Default: `False`)
-
-If your test methods contains docstrings, you can display such docstrings
-instead of display the test name (ex: `module.TestCase.test_method`). In
-order to use this feature, you have to enable verbose output by setting
-`TEST_OUTPUT_VERBOSE = 2`.
-
-**TEST_OUTPUT_DIR** (Default: `"."`)
-
-Tells the test runner where to put the XML reports. If the directory
-couldn't be found, the test runner will try to create it before
-generate the XML files.
-
-**TEST_OUTPUT_FILE_NAME** (Default: `None`)
-
-Tells the test runner to output a single XML report with this filename
-under `os.path.join(TEST_OUTPUT_DIR, TEST_OUTPUT_FILE_NAME)`. Please note
-that for long running tests, this will keep the results in memory for
-a longer time than multiple reports, and may use up more resources.
+|setting|default|values|description|
+|-|-|-|-|
+|`TEST_OUTPUT_VERBOSE`|`1`|`0\|1\|2`|Besides the XML reports generated by the test runner, a bunch of useful information is printed to the `sys.stderr` stream, just like the `TextTestRunner` does. Use this setting to choose between a verbose and a non-verbose output.|
+|`TEST_OUTPUT_DESCRIPTIONS`|`False`|`True\|False`|If your test methods contains docstrings, you can display such docstrings instead of display the test name (ex: `module.TestCase.test_method`).<br>In order to use this feature, you have to enable verbose output by setting `TEST_OUTPUT_VERBOSE = 2`.<br>Only effects stdout and not XML output.|
+|`TEST_OUTPUT_DIR`|`"."`|`<str>`|Tells the test runner where to put the XML reports. If the directory couldn't be found, the test runner will try to create it before generate the XML files.|
+|`TEST_OUTPUT_FILE_NAME`|`None`|`<str>`|Tells the test runner to output a single XML report with this filename under `os.path.join(TEST_OUTPUT_DIR, TEST_OUTPUT_FILE_NAME)`.<br>Please note that for long running tests, this will keep the results in memory for a longer time than multiple reports, and may use up more resources.|
 
 
 ## Contributing
@@ -191,12 +257,10 @@ You can find more information about `tox` at <https://testrun.org/tox/latest/>.
 
 ```bash
 $ pip install tox
+
+# basic sanity test, friendly output
+$ tox -e pytest
+
+# all combinations
 $ tox
 ```
-
-## Work in progress
-
-There is a [rewrite branch](https://github.com/xmlrunner/unittest-xml-reporting/tree/rewrite) which contains better unit tests and uses a different runner. It
-introduces a `CompositeTestResult` which allows the use of both `TextTestResult`
-and `XMLTestResult` as delegates. If you would like to help reconcile both
-branches, pull requests are welcome.

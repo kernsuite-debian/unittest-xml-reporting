@@ -4,7 +4,7 @@ import sys
 import os
 from os import path
 import glob
-import mock
+from unittest import mock
 import tempfile
 import shutil
 
@@ -16,6 +16,7 @@ else:
     from django.test.utils import get_runner
     from django.conf import settings, UserSettingsHolder
     from django.apps import apps
+    settings.configure(DEBUG=True)
 
 
 TESTS_DIR = path.dirname(__file__)
@@ -34,6 +35,7 @@ class DjangoTest(unittest.TestCase):
         self.old_settings = settings._wrapped
         os.environ['DJANGO_SETTINGS_MODULE'] = 'example.settings'
         settings.INSTALLED_APPS  # load settings on first access
+        settings.DATABASES['default'] = {}
         settings.DATABASES['default']['NAME'] = path.join(
             self.tmpdir, 'db.sqlilte3')
         # this goes around the "settings already loaded" issue.
@@ -55,12 +57,16 @@ class DjangoTest(unittest.TestCase):
         test_ids = [test.id() for test in suite]
         self.assertEqual(test_ids, [
             'app2.tests.DummyTestCase.test_pass',
+            'app.tests.DummyTestCase.test_negative_comment1',
+            'app.tests.DummyTestCase.test_negative_comment2',
             'app.tests.DummyTestCase.test_pass',
         ])
         suite = runner.build_suite(test_labels=[])
         test_ids = [test.id() for test in suite]
         self.assertEqual(set(test_ids), set([
             'app.tests.DummyTestCase.test_pass',
+            'app.tests.DummyTestCase.test_negative_comment1',
+            'app.tests.DummyTestCase.test_negative_comment2',
             'app2.tests.DummyTestCase.test_pass',
         ]))
 
