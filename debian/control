@@ -12,8 +12,8 @@ Build-Depends: debhelper (>=11),
  python3-pytest-runner,
  python3-pytest,
  python3-lxml
-Standards-Version: 4.5.0
-X-Python3-Version: >= 3.6
+Standards-Version: 4.6.1
+X-Python3-Version: >= 3.8
 Homepage: https://github.com/danielfm/unittest-xml-reporting
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/unittext-xml-reporting
 Vcs-Browser: http://anonscm.debian.org/viewvc/python-modules/packages/unittest-xml-reporting

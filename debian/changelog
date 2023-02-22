@@ -1,3 +1,10 @@
+unittest-xml-reporting (3.2.0-1kern1) focal; urgency=medium
+
+  [ Athanaseus Javas Ramaila ]
+  * New upstream version 3.2.0
+
+ -- KERN packaging <packaging@kernsuite.info>  Wed, 22 Feb 2023 12:09:42 +0000
+
 unittest-xml-reporting (3.0.4-1kern1) focal; urgency=medium
 
   [ Athanaseus Javas Ramaila ]
