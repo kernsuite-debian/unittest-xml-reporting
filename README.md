@@ -3,7 +3,6 @@
 [![Development Status](https://img.shields.io/pypi/status/unittest-xml-reporting.svg)](https://pypi.python.org/pypi/unittest-xml-reporting/)
 [![Documentation Status](https://readthedocs.org/projects/unittest-xml-reporting/badge/?version=latest)](http://unittest-xml-reporting.readthedocs.io/en/latest/?badge=latest)
 
-[![Build Status](https://travis-ci.org/xmlrunner/unittest-xml-reporting.svg?branch=master)](https://travis-ci.org/xmlrunner/unittest-xml-reporting)
 [![codecov.io Coverage Status](https://codecov.io/github/xmlrunner/unittest-xml-reporting/coverage.svg?branch=master)](https://codecov.io/github/xmlrunner/unittest-xml-reporting?branch=master)
 [![Coveralls Coverage Status](https://coveralls.io/repos/xmlrunner/unittest-xml-reporting/badge.svg?branch=master&service=github)](https://coveralls.io/github/xmlrunner/unittest-xml-reporting?branch=master)
 [![Requirements Status](https://requires.io/github/xmlrunner/unittest-xml-reporting/requirements.svg?branch=master)](https://requires.io/github/xmlrunner/unittest-xml-reporting/requirements/?branch=master)
@@ -17,7 +16,9 @@ and continuous integration servers.
 
 ## Requirements
 
-* Python 3.5+
+* Python 3.7+
+* Please note Python 3.6 end-of-life was in Dec 2021, last version supporting 3.6 was 3.1.0
+* Please note Python 3.5 end-of-life was in Sep 2020, last version supporting 3.5 was 3.1.0
 * Please note Python 2.7 end-of-life was in Jan 2020, last version supporting 2.7 was 2.5.2
 * Please note Python 3.4 end-of-life was in Mar 2019, last version supporting 3.4 was 2.5.2
 * Please note Python 2.6 end-of-life was in Oct 2013, last version supporting 2.6 was 1.14.0
