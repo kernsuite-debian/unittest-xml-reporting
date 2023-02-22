@@ -270,12 +270,12 @@ class XMLTestRunnerTestCase(unittest.TestCase):
             '//testcase': ('classname', 'name'),
             '//failure': ('message',),
         })
-        self.assertRegexpMatches(
+        self.assertRegex(
             output,
             r'classname="tests\.testsuite\.(XMLTestRunnerTestCase\.)?'
             r'DummyTest" name="test_pass"'.encode('utf8'),
         )
-        self.assertRegexpMatches(
+        self.assertRegex(
             output,
             r'classname="tests\.testsuite\.(XMLTestRunnerTestCase\.)?'
             r'DummySubTest" name="test_subTest_pass"'.encode('utf8'),
@@ -491,12 +491,12 @@ class XMLTestRunnerTestCase(unittest.TestCase):
             '//testcase': ('classname', 'name'),
             '//failure': ('message',),
         })
-        self.assertRegexpMatches(
+        self.assertRegex(
             output,
             br'<testcase classname="tests\.testsuite\.'
             br'(XMLTestRunnerTestCase\.)?DummySubTest" '
             br'name="test_subTest_fail \(i=0\)"')
-        self.assertRegexpMatches(
+        self.assertRegex(
             output,
             br'<testcase classname="tests\.testsuite\.'
             br'(XMLTestRunnerTestCase\.)?DummySubTest" '
@@ -520,12 +520,12 @@ class XMLTestRunnerTestCase(unittest.TestCase):
             '//testcase': ('classname', 'name'),
             '//failure': ('message',),
         })
-        self.assertRegexpMatches(
+        self.assertRegex(
             output,
             br'<testcase classname="tests\.testsuite\.'
             br'(XMLTestRunnerTestCase\.)?DummySubTest" '
             br'name="test_subTest_error \(i=0\)"')
-        self.assertRegexpMatches(
+        self.assertRegex(
             output,
             br'<testcase classname="tests\.testsuite\.'
             br'(XMLTestRunnerTestCase\.)?DummySubTest" '
@@ -981,6 +981,27 @@ class XMLProgramTestCase(unittest.TestCase):
             verbosity=mock.ANY,
             warnings=mock.ANY,
             output=open_file,
+        )
+
+        if sys.version_info[:2] > (3, 4):
+            kwargs.update(tb_locals=mock.ANY)
+
+        testrunner.assert_called_once_with(**kwargs)
+        exiter.assert_called_once_with(False)
+
+    @mock.patch('sys.argv', ['xmlrunner', '--outsuffix', ''])
+    @mock.patch('xmlrunner.runner.open')
+    @mock.patch('xmlrunner.runner.XMLTestRunner')
+    @mock.patch('sys.exit')
+    def test_xmlrunner_outsuffix(self, exiter, testrunner, opener):
+        xmlrunner.runner.XMLTestProgram()
+
+        kwargs = dict(
+            buffer=mock.ANY,
+            failfast=mock.ANY,
+            verbosity=mock.ANY,
+            warnings=mock.ANY,
+            outsuffix='',
         )
 
         if sys.version_info[:2] > (3, 4):
