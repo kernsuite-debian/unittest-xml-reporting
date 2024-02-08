@@ -1,3 +1,10 @@
+unittest-xml-reporting (3.2.0-1kern2) jammy; urgency=medium
+
+  [ Athanaseus Javas Ramaila ]
+  * Build for jammy 
+
+ -- KERN packaging <packaging@kernsuite.info>  Thu, 08 Feb 2024 12:11:42 +0000
+
 unittest-xml-reporting (3.2.0-1kern1) focal; urgency=medium
 
   [ Athanaseus Javas Ramaila ]
