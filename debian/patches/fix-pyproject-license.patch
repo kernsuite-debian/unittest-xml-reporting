@@ -1,0 +1,29 @@
+Description: Fix pyproject.toml metadata for modern Setuptools compatibility
+ - Convert license string to table for PEP 621 compliance.
+ - Remove invalid 'license-files' key from [project] section.
+ - Remove Python 3.14 classifier (not yet in trove-classifiers).
+Author: Athanaseus Javas Ramaila  <aramaila@sarao.ac.za>
+Last-Update: 2026-03-20
+
+diff --git a/pyproject.toml b/pyproject.toml
+index d4b6678..a4b1812 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -8,8 +8,7 @@ requires = [
+ 
+ [project]
+ name = "unittest-xml-reporting"
+-license = "BSD-2-Clause"
+-license-files = [ "LICENSE" ]
++license = {text = "BSD-2-Clause"}
+ dynamic = [
+     "version",
+ ]
+@@ -38,7 +37,6 @@ classifiers = [
+     "Programming Language :: Python :: 3.11",
+     "Programming Language :: Python :: 3.12",
+     "Programming Language :: Python :: 3.13",
+-    "Programming Language :: Python :: 3.14",
+     "Programming Language :: Python :: Implementation :: CPython",
+     "Programming Language :: Python :: Implementation :: PyPy",
+     "Topic :: Software Development :: Libraries :: Python Modules",

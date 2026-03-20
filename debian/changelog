@@ -1,7 +1,15 @@
+unittest-xml-reporting (4.0.0-2kern1) noble; urgency=medium
+
+  [ Athanaseus Javas Ramaila ]
+  * New upstream version 4.0.0
+  * Build for noble
+
+ -- KERN packaging <packaging@kernsuite.info>  Fri, 20 Mar 2026 14:52:02 +0100
+
 unittest-xml-reporting (3.2.0-1kern2) jammy; urgency=medium
 
   [ Athanaseus Javas Ramaila ]
-  * Build for jammy 
+  * Build for jammy
 
  -- KERN packaging <packaging@kernsuite.info>  Thu, 08 Feb 2024 12:11:42 +0000
 
